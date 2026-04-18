@@ -63,8 +63,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         sys.exit(
             "Usage:\n"
-            "  Single file:  python pdf_to_md.py <file.pdf>\n"
-            "  Folder:       python pdf_to_md.py <input_folder> <output_folder>"
+            "  Single file:  python3 pdf_to_md.py <file.pdf>\n"
+            "  Folder:       python3 pdf_to_md.py <input_folder> <output_folder>"
         )
 
     if len(sys.argv) == 2:
