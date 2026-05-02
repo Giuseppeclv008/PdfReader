@@ -28,6 +28,7 @@ def show_menu() -> tuple[str, str, dict]:
 
 
 def get_input_path() -> Path:
+    """Will repeatedly prompt the user until they enter a valid path to a PDF file or folder."""
     while True:
         raw = input("Path to PDF file or folder: ").strip().strip("'\"")
         p = Path(raw).expanduser()

@@ -1,6 +1,6 @@
 # PDF Converter
 
-Convert PDF files (single file or folder) to multiple formats using [PyMuPDF](https://pymupdf.readthedocs.io/).
+Extensible CLI tool that converts PDF files (single file or folder) to multiple formats using [PyMuPDF](https://pymupdf.readthedocs.io/). New output formats can be added without touching existing code — see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python3 pdf_converter.py [file.pdf | folder] [output_dir]
+python3 main.py [file.pdf | folder] [output_dir]
 ```
 
 All arguments are **optional**: if omitted, the script prompts for the path interactively.
@@ -28,13 +28,13 @@ All arguments are **optional**: if omitted, the script prompts for the path inte
 
 ```bash
 # Interactive menu, then enter the path
-python3 pdf_converter.py
+python3 main.py
 
 # Single file — output in ./output/
-python3 pdf_converter.py doc.pdf
+python3 main.py doc.pdf
 
 # Whole folder — output in ./output/
-python3 pdf_converter.py input_pdfs output_folder
+python3 main.py input_pdfs output_folder
 ```
 
 At startup the **format selection menu** is always shown.

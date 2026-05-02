@@ -2,7 +2,6 @@ pymupdf>=1.23.0
 tqdm>=4.66.0
 
 # Optional — required only for format 7 (OCR):
-# pip install pytesseract pillow
 # Also install the Tesseract binary:
 #   macOS:  brew install tesseract tesseract-lang
 #   Ubuntu: sudo apt install tesseract-ocr tesseract-ocr-ita
