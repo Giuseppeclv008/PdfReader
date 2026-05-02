@@ -11,40 +11,68 @@ try:
 except ImportError:
     sys.exit("Install: pip install pymupdf")
 
+try:
+    from tqdm import tqdm as _tqdm
+    def _progress(iterable, position=0, leave=True, **kw):
+        return _tqdm(iterable, position=position, leave=leave, **kw)
+except ImportError:
+    def _progress(iterable, desc="", leave=True, **_):
+        items = list(iterable)
+        for i, item in enumerate(items, start=1):
+            print(f"  {desc} {i}/{len(items)}", end="\r", flush=True)
+            yield item
+        if leave:
+            print()
+
 
 FORMATS = {
-    "1": ("Markdown — text only",              "md"),
-    "2": ("Markdown + embedded images (AI-ready)", "md"),
-    "3": ("Plain Text",                         "txt"),
-    "4": ("Structured JSON",                    "json"),
-    "5": ("HTML with embedded images",          "html"),
+    "1": ("Markdown — text only",                    "md"),
+    "2": ("Markdown + embedded images (AI-ready)",   "md"),
+    "3": ("Plain Text",                               "txt"),
+    "4": ("Structured JSON",                          "json"),
+    "5": ("HTML with embedded images",               "html"),
+    "6": ("Markdown + separate image files",         "md"),
+    "7": ("Markdown + OCR text (pytesseract)",       "md"),
 }
 
 FORMAT_DESCRIPTIONS = {
     "1": "Extracted text, structured by page. Fast, compact.",
-    "2": "Text + images as inline base64. AI reads everything in one file without pre-processing.",
+    "2": "Text + images as inline base64. Single file, but large for scanned books.",
     "3": "Raw text only, no formatting.",
     "4": "JSON: list of pages with text and separate image paths.",
     "5": "HTML with inline base64 images. Openable in a browser.",
+    "6": "Page images saved as separate files, referenced by path in markdown. No base64 — ideal for large scanned books.",
+    "7": "OCR via pytesseract: extracts text from scanned pages. Pure text, minimal tokens. Requires: pip install pytesseract pillow + Tesseract binary.",
 }
 
+# DPI used when rendering pages to images (formats 6 and 7)
+_RENDER_DPI = 150
+_OCR_DPI    = 200
+_RENDER_MAT = fitz.Matrix(_RENDER_DPI / 72, _RENDER_DPI / 72)
+_OCR_MAT    = fitz.Matrix(_OCR_DPI / 72,    _OCR_DPI / 72)
 
-def show_menu() -> tuple[str, str]:
-    print("\n" + "=" * 45)
-    print("         PDF CONVERTER — Choose format")
-    print("=" * 45)
+
+def show_menu() -> tuple[str, str, str | None]:
+    print("\n" + "=" * 55)
+    print("            PDF CONVERTER — Choose format")
+    print("=" * 55)
     for key, (name, ext) in FORMATS.items():
         print(f"  {key}. {name}")
         print(f"     └─ {FORMAT_DESCRIPTIONS[key]}")
-    print("=" * 45)
+    print("=" * 55)
 
     while True:
-        choice = input("Choice [1-5]: ").strip()
+        choice = input("Choice [1-7]: ").strip()
         if choice in FORMATS:
             name, ext = FORMATS[choice]
             print(f"\n→ Format: {name}\n")
-            return choice, ext
-        print("  Enter a number between 1 and 5.")
+            ocr_lang = None
+            if choice == "7":
+                raw = input("OCR language (e.g. eng, ita, ita+eng) [default: ita+eng]: ").strip()
+                ocr_lang = raw if raw else "ita+eng"
+                print(f"→ OCR language: {ocr_lang}\n")
+            return choice, ext, ocr_lang
+        print("  Enter a number between 1 and 7.")
 
 
 def get_input_path() -> Path:
@@ -146,9 +174,48 @@ def to_html(doc, stem: str) -> str:
     return "\n".join(parts)
 
 
+def to_md_linked(doc, stem: str, out_dir: Path) -> str:
+    """Render each page as a JPEG file, reference by relative path — no base64."""
+    img_dir = out_dir / f"{stem}_pages"
+    img_dir.mkdir(parents=True, exist_ok=True)
+    lines = [f"# {stem}\n"]
+    pages = list(enumerate(doc, start=1))
+    for i, page in _progress(pages, desc="Rendering", unit="pg", position=1, leave=False):
+        pix = page.get_pixmap(matrix=_RENDER_MAT)
+        img_file = img_dir / f"page_{i:04d}.jpg"
+        pix.save(str(img_file))
+        rel = f"{stem}_pages/page_{i:04d}.jpg"
+        lines.append(f"\n---\n\n## Page {i}\n\n![Page {i}]({rel})\n")
+    return "\n".join(lines)
+
+
+def to_md_ocr(doc, stem: str, lang: str) -> str:
+    """OCR each page with pytesseract and write extracted text to markdown."""
+    try:
+        import pytesseract
+        from PIL import Image
+        import io
+    except ImportError:
+        sys.exit(
+            "Format 7 requires extra packages:\n"
+            "  pip install pytesseract pillow\n"
+            "  + install Tesseract binary: https://tesseract-ocr.github.io/tessdoc/Installation.html"
+        )
+
+    lines = [f"# {stem}\n"]
+    pages = list(enumerate(doc, start=1))
+    for i, page in _progress(pages, desc="OCR", unit="pg", position=1, leave=False):
+        pix = page.get_pixmap(matrix=_OCR_MAT)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        text = pytesseract.image_to_string(img, lang=lang).strip()
+        if text:
+            lines.append(f"\n---\n\n## Page {i}\n\n{text}\n")
+    return "\n".join(lines)
+
+
 # ── core convert ─────────────────────────────────────────────────────────────
 
-def convert_one(pdf_path: Path, out_dir: Path, choice: str, ext: str) -> None:
+def convert_one(pdf_path: Path, out_dir: Path, choice: str, ext: str, ocr_lang: str | None = None) -> None:
     doc = fitz.open(str(pdf_path))
     stem = pdf_path.stem
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -178,19 +245,29 @@ def convert_one(pdf_path: Path, out_dir: Path, choice: str, ext: str) -> None:
         out_file = out_dir / f"{stem}.{ext}"
         out_file.write_text(content, encoding="utf-8")
 
+    elif choice == "6":
+        content = to_md_linked(doc, stem, out_dir)
+        out_file = out_dir / f"{stem}_linked.{ext}"
+        out_file.write_text(content, encoding="utf-8")
+
+    elif choice == "7":
+        content = to_md_ocr(doc, stem, ocr_lang)
+        out_file = out_dir / f"{stem}_ocr.{ext}"
+        out_file.write_text(content, encoding="utf-8")
+
     doc.close()
     print(f"  ✓  {pdf_path.name} → {out_file.name}")
 
 
-def convert_folder(folder: Path, out_dir: Path, choice: str, ext: str) -> None:
+def convert_folder(folder: Path, out_dir: Path, choice: str, ext: str, ocr_lang: str | None = None) -> None:
     pdfs = sorted(folder.glob("*.pdf"))
     if not pdfs:
         sys.exit(f"No PDFs found in {folder}")
     print(f"Found {len(pdfs)} PDF(s) — output in: {out_dir}\n")
     errors = 0
-    for pdf in pdfs:
+    for pdf in _progress(pdfs, desc="Files", unit="pdf", position=0, leave=True):
         try:
-            convert_one(pdf, out_dir, choice, ext)
+            convert_one(pdf, out_dir, choice, ext, ocr_lang)
         except Exception as e:
             print(f"  ✗  {pdf.name}: {e}")
             errors += 1
@@ -200,7 +277,7 @@ def convert_folder(folder: Path, out_dir: Path, choice: str, ext: str) -> None:
 # ── main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    choice, ext = show_menu()
+    choice, ext, ocr_lang = show_menu()
 
     # input path: from args or interactive prompt
     if len(sys.argv) >= 2:
@@ -220,8 +297,8 @@ if __name__ == "__main__":
             out_dir = input_path.parent / "output"
 
     if input_path.is_dir():
-        convert_folder(input_path, out_dir, choice, ext)
+        convert_folder(input_path, out_dir, choice, ext, ocr_lang)
     elif input_path.suffix.lower() == ".pdf":
-        convert_one(input_path, out_dir, choice, ext)
+        convert_one(input_path, out_dir, choice, ext, ocr_lang)
     else:
         sys.exit(f"Invalid input (expected .pdf file or folder): {input_path}")

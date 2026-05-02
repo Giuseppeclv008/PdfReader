@@ -11,6 +11,7 @@ python3 -m venv venv
 source venv/bin/activate        # macOS/Linux
 # venv\Scripts\activate         # Windows
 pip install -r requirements.txt
+
 ```
 
 ---
@@ -45,12 +46,21 @@ At startup the **format selection menu** is always shown.
 | # | Format | Extension | Notes |
 | --- | --- | --- | --- |
 | 1 | **Markdown — text only** | `.md` | Extracted text, structured by page |
-| 2 | **Markdown AI-ready** | `_ai.md` | Text + base64 embedded images. Single file, readable directly by AI tools without pre-processing |
+| 2 | **Markdown AI-ready** | `_ai.md` | Text + base64 embedded images. Single file — can be large for scanned books |
 | 3 | **Plain Text** | `.txt` | Raw text, no formatting |
 | 4 | **Structured JSON** | `.json` | List of pages with text and image paths saved in `<name>_images/` |
 | 5 | **HTML embedded** | `.html` | Text + base64 inline images, openable in a browser |
+| 6 | **Markdown + separate images** | `_linked.md` | Page images saved as files in `<name>_pages/`, referenced by path. No base64 — ideal for large scanned books |
+| 7 | **Markdown + OCR** | `_ocr.md` | Text extracted via Tesseract OCR. Pure text output, minimal tokens. Requires pytesseract + Tesseract binary |
 
-> **For image-heavy PDFs intended for AI tools**: use format **2 (Markdown AI-ready)**. Images are embedded as data URIs — the AI sees both text and images in a single file with no intermediate steps.
+### Choosing the right format for scanned books
+
+| Scenario | Recommended format |
+| --- | --- |
+| Scanned book, AI tool with file access | **6** — images as separate files, no token bloat |
+| Scanned book, need text only | **7** — OCR extracts readable text, minimal tokens |
+| Small PDF with a few images | **2** — single self-contained file |
+| Text-based PDF (not scanned) | **1** or **3** |
 
 ---
 
