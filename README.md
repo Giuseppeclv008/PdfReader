@@ -1,32 +1,15 @@
-# pdf_to_md
+# PDF Converter
 
-Convert PDF files to Markdown using [PyMuPDF](https://pymupdf.readthedocs.io/).
+Convert PDF files (single file or folder) to multiple formats using [PyMuPDF](https://pymupdf.readthedocs.io/).
 
 ---
 
 ## Setup
 
-### 1. Create virtual environment
-
 ```bash
 python3 -m venv venv
-```
-
-### 2. Activate it
-
-**macOS / Linux:**
-```bash
-source venv/bin/activate
-```
-
-**Windows:**
-```cmd
-venv\Scripts\activate
-```
-
-### 3. Install dependencies
-
-```bash
+source venv/bin/activate        # macOS/Linux
+# venv\Scripts\activate         # Windows
 pip install -r requirements.txt
 ```
 
@@ -34,43 +17,49 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Single file
+```bash
+python3 pdf_to_md.py [file.pdf | folder] [output_dir]
+```
+
+All arguments are **optional**: if omitted, the script prompts for the path interactively.
+
+### Examples
 
 ```bash
-python3 pdf_to_md.py path/to/file.pdf
+# Interactive menu, then enter the path
+python3 pdf_to_md.py
+
+# Single file — output in ./output/
+python3 pdf_to_md.py doc.pdf
+
+# Whole folder — output in ./output/
+python3 pdf_to_md.py input_pdfs output_folder
 ```
 
-Output: `path/to/file.md` (same directory as input)
-
-### Batch folder
-
-```bash
-python3 pdf_to_md.py path/to/input_folder path/to/output_folder
-```
-
-Converts all `.pdf` files in `input_folder` and writes `.md` files to `output_folder`.
+At startup the **format selection menu** is always shown.
 
 ---
 
-## Output format
+## Output formats
 
-Each PDF becomes one Markdown file:
+| # | Format | Extension | Notes |
+| --- | --- | --- | --- |
+| 1 | **Markdown — text only** | `.md` | Extracted text, structured by page |
+| 2 | **Markdown AI-ready** | `_ai.md` | Text + base64 embedded images. Single file, readable directly by AI tools without pre-processing |
+| 3 | **Plain Text** | `.txt` | Raw text, no formatting |
+| 4 | **Structured JSON** | `.json` | List of pages with text and image paths saved in `<name>_images/` |
+| 5 | **HTML embedded** | `.html` | Text + base64 inline images, openable in a browser |
 
-```
-# filename
+> **For image-heavy PDFs intended for AI tools**: use format **2 (Markdown AI-ready)**. Images are embedded as data URIs — the AI sees both text and images in a single file with no intermediate steps.
 
 ---
 
-## Page 1
+## Output directory
 
-<text content>
-
----
-
-## Page 2
-
-<text content>
-```
+| Input | Default output |
+| --- | --- |
+| `file.pdf` | `./output/` next to the file |
+| `folder/` | `./folder_output/` |
 
 ---
 
