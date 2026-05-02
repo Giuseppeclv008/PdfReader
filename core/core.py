@@ -1,4 +1,4 @@
-"""core/pdf_converter.py — orchestrate single-file and folder conversions"""
+"""core/core.py — orchestrate single-file and folder conversions"""
 
 import sys
 from pathlib import Path
@@ -10,6 +10,7 @@ from utils.utils import progress
 
 
 def convert_one(pdf_path: Path, out_dir: Path, choice: str, **kwargs) -> None:
+    """Convert a single PDF file to the chosen format, saving the output."""
     fmt = get_format(choice)
     doc = fitz.open(str(pdf_path))
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -21,6 +22,7 @@ def convert_one(pdf_path: Path, out_dir: Path, choice: str, **kwargs) -> None:
 
 
 def convert_folder(folder: Path, out_dir: Path, choice: str, **kwargs) -> None:
+    """Convert all PDFs in a folder, showing progress and errors."""
     pdfs = sorted(folder.glob("*.pdf"))
     if not pdfs:
         sys.exit(f"No PDFs found in {folder}")

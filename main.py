@@ -5,7 +5,7 @@ from pathlib import Path
 
 import converters  # noqa: F401 — registers all built-in formats
 from menu.menu import show_menu, get_input_path
-from core.pdf_converter import convert_one, convert_folder
+from core.core import convert_one, convert_folder
 
 if __name__ == "__main__":
     choice, ext, extra_kwargs = show_menu()
