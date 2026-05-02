@@ -13,25 +13,25 @@ except ImportError:
 
 
 FORMATS = {
-    "1": ("Markdown — text only",                    "md"),
-    "2": ("Markdown + immagini embedded (AI-ready)", "md"),
-    "3": ("Plain Text",                               "txt"),
-    "4": ("JSON strutturato",                         "json"),
-    "5": ("HTML con immagini embedded",               "html"),
+    "1": ("Markdown — text only",              "md"),
+    "2": ("Markdown + embedded images (AI-ready)", "md"),
+    "3": ("Plain Text",                         "txt"),
+    "4": ("Structured JSON",                    "json"),
+    "5": ("HTML with embedded images",          "html"),
 }
 
 FORMAT_DESCRIPTIONS = {
-    "1": "Testo estratto, struttura per pagine. Veloce, compatto.",
-    "2": "Testo + immagini come base64 inline. AI legge tutto in un file senza pre-processing.",
-    "3": "Solo testo grezzo, nessuna formattazione.",
-    "4": "JSON: lista pagine con testo e path immagini separate.",
-    "5": "HTML con immagini base64 inline. Apribile su browser.",
+    "1": "Extracted text, structured by page. Fast, compact.",
+    "2": "Text + images as inline base64. AI reads everything in one file without pre-processing.",
+    "3": "Raw text only, no formatting.",
+    "4": "JSON: list of pages with text and separate image paths.",
+    "5": "HTML with inline base64 images. Openable in a browser.",
 }
 
 
 def show_menu() -> tuple[str, str]:
     print("\n" + "=" * 45)
-    print("         PDF CONVERTER — Scegli formato")
+    print("         PDF CONVERTER — Choose format")
     print("=" * 45)
     for key, (name, ext) in FORMATS.items():
         print(f"  {key}. {name}")
@@ -39,21 +39,21 @@ def show_menu() -> tuple[str, str]:
     print("=" * 45)
 
     while True:
-        choice = input("Scelta [1-5]: ").strip()
+        choice = input("Choice [1-5]: ").strip()
         if choice in FORMATS:
             name, ext = FORMATS[choice]
-            print(f"\n→ Formato: {name}\n")
+            print(f"\n→ Format: {name}\n")
             return choice, ext
-        print("  Inserisci un numero tra 1 e 5.")
+        print("  Enter a number between 1 and 5.")
 
 
 def get_input_path() -> Path:
     while True:
-        raw = input("Percorso file PDF o cartella: ").strip().strip("'\"")
+        raw = input("Path to PDF file or folder: ").strip().strip("'\"")
         p = Path(raw).expanduser()
         if p.exists():
             return p
-        print(f"  Non trovato: {p}")
+        print(f"  Not found: {p}")
 
 
 def extract_images_b64(page) -> list[str]:
@@ -78,7 +78,7 @@ def to_md_text(doc, stem: str) -> str:
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
         if text:
-            lines.append(f"\n---\n\n## Pagina {i}\n\n{text}\n")
+            lines.append(f"\n---\n\n## Page {i}\n\n{text}\n")
     return "\n".join(lines)
 
 
@@ -87,11 +87,11 @@ def to_md_ai(doc, stem: str) -> str:
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
         images = extract_images_b64(page)
-        lines.append(f"\n---\n\n## Pagina {i}\n")
+        lines.append(f"\n---\n\n## Page {i}\n")
         if text:
             lines.append(f"\n{text}\n")
         for j, data_uri in enumerate(images, start=1):
-            lines.append(f"\n![Pagina {i} — Immagine {j}]({data_uri})\n")
+            lines.append(f"\n![Page {i} — Image {j}]({data_uri})\n")
     return "\n".join(lines)
 
 
@@ -100,7 +100,7 @@ def to_txt(doc) -> str:
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
         if text:
-            parts.append(f"[Pagina {i}]\n{text}")
+            parts.append(f"[Page {i}]\n{text}")
     return "\n\n".join(parts)
 
 
@@ -136,12 +136,12 @@ def to_html(doc, stem: str) -> str:
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
         images = extract_images_b64(page)
-        parts.append(f"<hr><h2>Pagina {i}</h2>")
+        parts.append(f"<hr><h2>Page {i}</h2>")
         if text:
             escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             parts.append(f"<pre>{escaped}</pre>")
         for data_uri in images:
-            parts.append(f"<img src='{data_uri}' alt='Pagina {i}'>")
+            parts.append(f"<img src='{data_uri}' alt='Page {i}'>")
     parts.append("</body></html>")
     return "\n".join(parts)
 
@@ -185,8 +185,8 @@ def convert_one(pdf_path: Path, out_dir: Path, choice: str, ext: str) -> None:
 def convert_folder(folder: Path, out_dir: Path, choice: str, ext: str) -> None:
     pdfs = sorted(folder.glob("*.pdf"))
     if not pdfs:
-        sys.exit(f"Nessun PDF in {folder}")
-    print(f"Trovati {len(pdfs)} PDF — output in: {out_dir}\n")
+        sys.exit(f"No PDFs found in {folder}")
+    print(f"Found {len(pdfs)} PDF(s) — output in: {out_dir}\n")
     errors = 0
     for pdf in pdfs:
         try:
@@ -194,7 +194,7 @@ def convert_folder(folder: Path, out_dir: Path, choice: str, ext: str) -> None:
         except Exception as e:
             print(f"  ✗  {pdf.name}: {e}")
             errors += 1
-    print(f"\nFine. {len(pdfs) - errors}/{len(pdfs)} convertiti.")
+    print(f"\nDone. {len(pdfs) - errors}/{len(pdfs)} converted.")
 
 
 # ── main ─────────────────────────────────────────────────────────────────────
@@ -202,15 +202,15 @@ def convert_folder(folder: Path, out_dir: Path, choice: str, ext: str) -> None:
 if __name__ == "__main__":
     choice, ext = show_menu()
 
-    # input path: da args o prompt
+    # input path: from args or interactive prompt
     if len(sys.argv) >= 2:
         input_path = Path(sys.argv[1]).expanduser()
         if not input_path.exists():
-            sys.exit(f"Non trovato: {input_path}")
+            sys.exit(f"Not found: {input_path}")
     else:
         input_path = get_input_path()
 
-    # output dir: da args, o default accanto all'input
+    # output dir: from args, or default next to input
     if len(sys.argv) >= 3:
         out_dir = Path(sys.argv[2]).expanduser()
     else:
@@ -224,4 +224,4 @@ if __name__ == "__main__":
     elif input_path.suffix.lower() == ".pdf":
         convert_one(input_path, out_dir, choice, ext)
     else:
-        sys.exit(f"Input non valido (serve .pdf o cartella): {input_path}")
+        sys.exit(f"Invalid input (expected .pdf file or folder): {input_path}")
