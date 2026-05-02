@@ -10,6 +10,7 @@ from utils.utils import progress
 
 
 def convert_one(source_path: Path, out_dir: Path, choice: str, **kwargs) -> None:
+    """Convert a single file and save the output."""
     fmt = get_format(choice)
     doc = fitz.open(str(source_path)) if source_path.suffix.lower() == ".pdf" else None
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -25,6 +26,7 @@ def convert_one(source_path: Path, out_dir: Path, choice: str, **kwargs) -> None
 
 
 def convert_folder(folder: Path, out_dir: Path, choice: str, **kwargs) -> None:
+    """Convert all files of the chosen format in the given folder."""
     fmt = get_format(choice)
     files = sorted(folder.glob(f"*{fmt.source_ext}"))
     if not files:
