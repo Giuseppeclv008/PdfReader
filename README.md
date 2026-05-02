@@ -18,7 +18,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```bash
-python3 pdf_to_md.py [file.pdf | folder] [output_dir]
+python3 pdf_converter.py [file.pdf | folder] [output_dir]
 ```
 
 All arguments are **optional**: if omitted, the script prompts for the path interactively.
@@ -27,13 +27,13 @@ All arguments are **optional**: if omitted, the script prompts for the path inte
 
 ```bash
 # Interactive menu, then enter the path
-python3 pdf_to_md.py
+python3 pdf_converter.py
 
 # Single file — output in ./output/
-python3 pdf_to_md.py doc.pdf
+python3 pdf_converter.py doc.pdf
 
 # Whole folder — output in ./output/
-python3 pdf_to_md.py input_pdfs output_folder
+python3 pdf_converter.py input_pdfs output_folder
 ```
 
 At startup the **format selection menu** is always shown.
