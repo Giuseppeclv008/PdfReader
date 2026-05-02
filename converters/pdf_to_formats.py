@@ -1,4 +1,4 @@
-"""converters/converters.py — built-in conversion formats, registered at import time"""
+"""converters/pdf_to_formats.py — built-in PDF → * formats, registered at import time"""
 
 import json
 import sys
@@ -12,7 +12,7 @@ from converters.base import ConversionFormat, register
 # ── converter functions ───────────────────────────────────────────────────────
 # All signatures: (doc, stem: str, out_dir: Path, **kwargs) -> (content: str, filename: str)
 
-def _to_md_text(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _pdf_to_md_text(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     lines = [f"# {stem}\n"]
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
@@ -21,7 +21,7 @@ def _to_md_text(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     return "\n".join(lines), f"{stem}.md"
 
 
-def _to_md_ai(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _pdf_to_md_ai(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     lines = [f"# {stem}\n"]
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
@@ -34,7 +34,7 @@ def _to_md_ai(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     return "\n".join(lines), f"{stem}_ai.md"
 
 
-def _to_txt(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _pdf_to_txt(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     parts = []
     for i, page in enumerate(doc, start=1):
         text = page.get_text("text").strip()
@@ -43,7 +43,7 @@ def _to_txt(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     return "\n\n".join(parts), f"{stem}.txt"
 
 
-def _to_json(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _pdf_to_json(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     img_dir = out_dir / f"{stem}_images"
     img_dir.mkdir(parents=True, exist_ok=True)
     pages = []
@@ -65,7 +65,7 @@ def _to_json(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     return content, f"{stem}.json"
 
 
-def _to_html(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _pdf_to_html(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     parts = [
         "<!DOCTYPE html><html><head>",
         f"<meta charset='utf-8'><title>{stem}</title>",
@@ -86,7 +86,7 @@ def _to_html(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     return "\n".join(parts), f"{stem}.html"
 
 
-def _to_md_linked(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _pdf_to_md_linked(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     img_dir = out_dir / f"{stem}_pages"
     img_dir.mkdir(parents=True, exist_ok=True)
     lines = [f"# {stem}\n"]
@@ -100,14 +100,14 @@ def _to_md_linked(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
     return "\n".join(lines), f"{stem}_linked.md"
 
 
-def _ocr_extra_args() -> dict:
+def _pdf_ocr_extra_args() -> dict:
     raw = input("OCR language (e.g. eng, ita, ita+eng) [default: ita+eng]: ").strip()
     lang = raw if raw else "ita+eng"
     print(f"→ OCR language: {lang}\n")
     return {"lang": lang}
 
 
-def _to_md_ocr(doc, stem: str, out_dir: Path, lang: str = "ita+eng", **_) -> tuple[str, str]:
+def _pdf_to_md_ocr(doc, stem: str, out_dir: Path, lang: str = "ita+eng", **_) -> tuple[str, str]:
     try:
         import pytesseract
         from PIL import Image
@@ -134,35 +134,35 @@ def _to_md_ocr(doc, stem: str, out_dir: Path, lang: str = "ita+eng", **_) -> tup
 register(ConversionFormat(
     key="1", name="Markdown — text only",
     description="Extracted text, structured by page. Fast, compact.",
-    ext="md", convert=_to_md_text,
+    ext="md", source_ext=".pdf", convert=_pdf_to_md_text,
 ))
 register(ConversionFormat(
     key="2", name="Markdown + embedded images (AI-ready)",
     description="Text + images as inline base64. Single file, but large for scanned books.",
-    ext="md", convert=_to_md_ai,
+    ext="md", source_ext=".pdf", convert=_pdf_to_md_ai,
 ))
 register(ConversionFormat(
     key="3", name="Plain Text",
     description="Raw text only, no formatting.",
-    ext="txt", convert=_to_txt,
+    ext="txt", source_ext=".pdf", convert=_pdf_to_txt,
 ))
 register(ConversionFormat(
     key="4", name="Structured JSON",
     description="JSON: list of pages with text and separate image paths.",
-    ext="json", convert=_to_json,
+    ext="json", source_ext=".pdf", convert=_pdf_to_json,
 ))
 register(ConversionFormat(
     key="5", name="HTML with embedded images",
     description="HTML with inline base64 images. Openable in a browser.",
-    ext="html", convert=_to_html,
+    ext="html", source_ext=".pdf", convert=_pdf_to_html,
 ))
 register(ConversionFormat(
     key="6", name="Markdown + separate image files",
     description="Page images saved as files, referenced by path. No base64 — ideal for large scanned books.",
-    ext="md", convert=_to_md_linked,
+    ext="md", source_ext=".pdf", convert=_pdf_to_md_linked,
 ))
 register(ConversionFormat(
     key="7", name="Markdown + OCR text (pytesseract)",
     description="OCR via pytesseract: extracts text from scanned pages. Requires: pip install pytesseract pillow + Tesseract binary.",
-    ext="md", convert=_to_md_ocr, extra_args=_ocr_extra_args,
+    ext="md", source_ext=".pdf", convert=_pdf_to_md_ocr, extra_args=_pdf_ocr_extra_args,
 ))

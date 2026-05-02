@@ -7,16 +7,21 @@ from typing import Callable, Optional
 
 @dataclass
 class ConversionFormat:
-    """Describes one output format and how to produce it.
+    """Describes one conversion format and how to produce it.
 
-    convert(doc, stem, out_dir, **kwargs) -> (content: str, filename: str)
-    extra_args()                           -> dict  (optional; prompts user)
+    convert(doc, stem, out_dir, *, source_path, **kwargs) -> (content, filename)
+      content  : str (text formats) or bytes (binary formats such as PDF)
+      doc      : fitz.Document for PDF sources; None for non-PDF sources
+      source_path passed as kwarg — use it when doc is None
+
+    extra_args() -> dict   (optional; prompts user for extra kwargs)
     """
     key: str
     name: str
     description: str
     ext: str
-    convert: Callable[..., tuple[str, str]]
+    source_ext: str
+    convert: Callable[..., tuple[str | bytes, str]]
     extra_args: Optional[Callable[[], dict]] = field(default=None, repr=False)
     
 # Global registry of formats, keyed by their unique 'key' field.

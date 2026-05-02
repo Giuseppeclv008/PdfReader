@@ -5,15 +5,16 @@ from pathlib import Path
 from converters.base import all_formats
 
 
-def show_menu() -> tuple[str, str, dict]:
+def show_menu() -> tuple[str, dict]:
     formats = all_formats()
     keys = list(formats.keys())
 
     print("\n" + "=" * 55)
-    print("            PDF CONVERTER — Choose format")
+    print("            FILE CONVERTER — Choose format")
     print("=" * 55)
     for key, fmt in formats.items():
-        print(f"  {key}. {fmt.name}")
+        source_hint = f" [{fmt.source_ext} → .{fmt.ext}]"
+        print(f"  {key}. {fmt.name}{source_hint}")
         print(f"     └─ {fmt.description}")
     print("=" * 55)
 
@@ -23,14 +24,13 @@ def show_menu() -> tuple[str, str, dict]:
             fmt = formats[choice]
             print(f"\n→ Format: {fmt.name}\n")
             extra_kwargs = fmt.extra_args() if fmt.extra_args else {}
-            return choice, fmt.ext, extra_kwargs
+            return choice, extra_kwargs
         print(f"  Enter one of: {', '.join(keys)}.")
 
 
 def get_input_path() -> Path:
-    """Will repeatedly prompt the user until they enter a valid path to a PDF file or folder."""
     while True:
-        raw = input("Path to PDF file or folder: ").strip().strip("'\"")
+        raw = input("Path to file or folder: ").strip().strip("'\"")
         p = Path(raw).expanduser()
         if p.exists():
             return p

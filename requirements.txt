@@ -1,5 +1,6 @@
 pymupdf>=1.23.0
 tqdm>=4.66.0
+markdown>=3.5
 
 # Optional — required only for format 7 (OCR):
 # Also install the Tesseract binary:
