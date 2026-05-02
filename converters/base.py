@@ -18,8 +18,9 @@ class ConversionFormat:
     ext: str
     convert: Callable[..., tuple[str, str]]
     extra_args: Optional[Callable[[], dict]] = field(default=None, repr=False)
-
-
+    
+# Global registry of formats, keyed by their unique 'key' field.
+# Each format module will call register() at import time to add itself to this registry.
 _registry: dict[str, ConversionFormat] = {}
 
 
