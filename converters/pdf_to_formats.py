@@ -104,10 +104,19 @@ def _pdf_ocr_extra_args() -> dict:
     raw = input("OCR language (e.g. eng, ita, ita+eng) [default: ita+eng]: ").strip()
     lang = raw if raw else "ita+eng"
     print(f"→ OCR language: {lang}\n")
-    return {"lang": lang}
+
+    math_raw = input("Enable math formula recognition via pix2tex? [y/N]: ").strip().lower()
+    math_ocr = math_raw in ("y", "yes")
+    if math_ocr:
+        print("→ Math OCR enabled (requires: pip install pix2tex)\n")
+
+    return {"lang": lang, "math_ocr": math_ocr}
 
 
-def _pdf_to_md_ocr(doc, stem: str, out_dir: Path, lang: str = "ita+eng", **_) -> tuple[str, str]:
+def _pdf_to_md_ocr(
+    doc, stem: str, out_dir: Path,
+    lang: str = "ita+eng", math_ocr: bool = False, **_
+) -> tuple[str, str]:
     try:
         import pytesseract
         from PIL import Image
@@ -118,14 +127,37 @@ def _pdf_to_md_ocr(doc, stem: str, out_dir: Path, lang: str = "ita+eng", **_) ->
             "  pip install pytesseract pillow\n"
             "  + install Tesseract binary: https://tesseract-ocr.github.io/tessdoc/Installation.html"
         )
+
+    latex_model = None
+    if math_ocr:
+        try:
+            from pix2tex.cli import LatexOCR
+            latex_model = LatexOCR()
+        except ImportError:
+            sys.exit(
+                "Math formula recognition requires an extra package:\n"
+                "  pip install pix2tex"
+            )
+
     lines = [f"# {stem}\n"]
     pages = list(enumerate(doc, start=1))
     for i, page in progress(pages, desc="OCR", unit="pg", position=1, leave=False):
         pix = page.get_pixmap(matrix=_OCR_MAT)
         img = Image.open(io.BytesIO(pix.tobytes("png")))
         text = pytesseract.image_to_string(img, lang=lang).strip()
+
+        lines.append(f"\n---\n\n## Page {i}\n")
         if text:
-            lines.append(f"\n---\n\n## Page {i}\n\n{text}\n")
+            lines.append(f"\n{text}\n")
+
+        if latex_model is not None:
+            try:
+                latex = latex_model(img)
+                if latex and latex.strip():
+                    lines.append(f"\n**Formulas:**\n\n$$\n{latex.strip()}\n$$\n")
+            except Exception:
+                pass
+
     return "\n".join(lines), f"{stem}_ocr.md"
 
 
@@ -162,7 +194,7 @@ register(ConversionFormat(
     ext="md", source_ext=".pdf", convert=_pdf_to_md_linked,
 ))
 register(ConversionFormat(
-    key="7", name="Markdown + OCR text (pytesseract)",
-    description="OCR via pytesseract: extracts text from scanned pages. Requires: pip install pytesseract pillow + Tesseract binary.",
+    key="7", name="Markdown + OCR text (pytesseract + optional math)",
+    description="OCR via pytesseract; optionally adds LaTeX math via pix2tex. Requires: pip install pytesseract pillow + Tesseract binary. Math: pip install pix2tex.",
     ext="md", source_ext=".pdf", convert=_pdf_to_md_ocr, extra_args=_pdf_ocr_extra_args,
 ))

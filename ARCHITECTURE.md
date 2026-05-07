@@ -194,6 +194,7 @@ from . import my_format  # noqa: F401
 | `markdown` | Markdown → HTML conversion (format 8) |
 | `pytesseract` | OCR — format 7 only, optional |
 | `Pillow` (`PIL`) | Image I/O for OCR pipeline — format 7 only, optional |
+| `pix2tex` | Math formula OCR (LaTeX output) — format 7 math mode only, optional |
 
 ---
 
