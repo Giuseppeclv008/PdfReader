@@ -131,6 +131,15 @@ def _is_math_font(name: str) -> bool:
     return any(u.startswith(mf) or u.startswith("+" + mf) for mf in _MATH_FONTS)
 
 
+def _has_formula_chars(text: str) -> bool:
+    """True if text contains CMEX control chars or private-use-area bracket glyphs."""
+    return any(
+        (ord(c) < 0x20 and c not in '\t\n\r ')
+        or (0xf800 <= ord(c) <= 0xf8ff)
+        for c in text
+    )
+
+
 def _span_chars(span) -> str:
     return "".join(c["c"] for c in span.get("chars", []))
 
@@ -243,9 +252,15 @@ def _extract_vector_formula_regions(page, pad_h=8, pad_v=4, gap=25,
                     mc += len(t)
         frac = mc / ac if ac else 0
         r = fitz.Rect(block["bbox"])
-        if frac < min_math_frac or ac > max_chars:
+        block_text_raw = "".join(
+            _span_chars(s)
+            for line in block.get("lines", [])
+            for s in line.get("spans", [])
+        )
+        has_fchars = _has_formula_chars(block_text_raw)
+        if (frac < min_math_frac or ac > max_chars) and not has_fchars:
             prose_yranges.append((r.y0, r.y1))
-        if mc > 0 and frac >= min_math_frac and ac <= max_chars:
+        if (mc > 0 and frac >= min_math_frac and ac <= max_chars) or (has_fchars and mc > 0):
             # Skip pure numeric labels (chart axis ticks like -1.5, 0.0, 1.5)
             block_text = "".join(
                 _span_chars(s)
@@ -365,6 +380,17 @@ def _vector_page_to_md(page, latex_model, io_mod, Image_cls) -> str:
             continue
         block_text = _reconstruct_block_text(block)
         if not block_text:
+            continue
+        # Skip CMEX bracket/delimiter glyphs that leaked as prose
+        if _has_formula_chars(block_text):
+            continue
+        # Skip chart legend labels: single-line, short, "Name — param = value" pattern
+        if (
+            '\n' not in block_text.strip()
+            and bh <= 11
+            and _re.search(r'[—–]', block_text)
+            and _re.search(r'=\s*[\d.]', block_text)
+        ):
             continue
         # Skip slide page-counter blocks like "3/64", "12/64"
         if _re.fullmatch(r"\d+/\d+", block_text.strip()):
