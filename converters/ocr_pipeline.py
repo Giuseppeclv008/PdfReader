@@ -177,6 +177,18 @@ def _vector_page_to_md(page, latex_model, io_mod, Image_cls) -> str:
         mat = _formula_render_mat()
         for r in _extract_vector_formula_regions(page):
             try:
+                # Skip pix2tex when PyMuPDF can already extract clean text (no CMEX garbage).
+                # For LaTeX-compiled PDFs, direct extraction is more accurate than image OCR.
+                raw_d = page.get_text("rawdict", clip=r)
+                raw_text = "".join(
+                    c["c"]
+                    for b in raw_d.get("blocks", []) if b.get("type", 0) == 0
+                    for line in b.get("lines", [])
+                    for span in line.get("spans", [])
+                    for c in span.get("chars", [])
+                )
+                if raw_text.strip() and not _has_formula_chars(raw_text):
+                    continue  # Good text available — prose loop will handle it
                 clip_pix = page.get_pixmap(matrix=mat, clip=r)
                 formula_img = Image_cls.open(io_mod.BytesIO(clip_pix.tobytes("png")))
                 latex = _try_latex(latex_model, formula_img)
