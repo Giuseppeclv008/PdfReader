@@ -16,7 +16,9 @@ PdfReader/
 ├── converters/
 │   ├── __init__.py             # Side-effect imports: triggers registration of all built-ins
 │   ├── base.py                 # ConversionFormat dataclass + global registry
-│   ├── pdf_to_formats.py       # Built-in PDF → * formats (keys 1–7)
+│   ├── pdf_to_formats.py       # Built-in PDF → * formats (keys 1–6): text, JSON, HTML, images
+│   ├── math_helpers.py         # Math detection primitives: font sets, char filters, pix2tex wrapper
+│   ├── ocr_pipeline.py         # OCR pipeline (format 7): text extraction + pix2tex integration
 │   └── md_to_pdf.py            # Built-in MD → PDF format (key 8)
 ├── core/
 │   └── core.py                 # convert_one() / convert_folder() — pure orchestration
@@ -47,7 +49,9 @@ No existing file needs to change.
 | --- | --- |
 | `main.py` | Wires together menu, path resolution, and converter call |
 | `converters/base.py` | Owns the registry contract and data structure |
-| `converters/pdf_to_formats.py` | Implements and registers built-in PDF → * formats |
+| `converters/pdf_to_formats.py` | Implements and registers simple PDF → * formats (1–6): text, JSON, HTML, image links |
+| `converters/math_helpers.py` | Low-level math detection: CM font recognition, CMEX char filtering, LaTeX validation, pix2tex wrapping |
+| `converters/ocr_pipeline.py` | OCR pipeline: text block reconstruction, formula region detection, vector-page extraction; registers format 7 |
 | `converters/md_to_pdf.py` | Implements and registers MD → PDF format |
 | `core/core.py` | Opens source files, dispatches to registry, writes output |
 | `menu/menu.py` | Reads registry, renders menu, collects user input |
@@ -58,12 +62,15 @@ No existing file needs to change.
 
 ```text
 main.py
-  ├── menu/menu.py   → converters/base.py (read registry)
-  ├── core/core.py   → converters/base.py (get_format)
-  │                  → utils/utils.py
-  └── converters/    → converters/base.py (register)
-                     → config/config.py   (PDF formats only)
-                     → utils/utils.py     (PDF formats only)
+  ├── menu/menu.py      → converters/base.py (read registry)
+  ├── core/core.py      → converters/base.py (get_format)
+  │                     → utils/utils.py
+  └── converters/
+        ├── pdf_to_formats.py  → converters/base.py, config/config.py, utils/utils.py
+        ├── math_helpers.py    → (no internal imports — leaf module)
+        ├── ocr_pipeline.py    → converters/base.py, converters/math_helpers.py,
+        │                         config/config.py, utils/utils.py
+        └── md_to_pdf.py       → converters/base.py
 ```
 
 `menu` and `core` depend only on `base` (the abstraction), never on concrete converter implementations. Converters do not depend on menu or core.
@@ -171,6 +178,12 @@ register(ConversionFormat(
 
 ```python
 from . import my_format  # noqa: F401
+```
+
+If your format needs math detection or LaTeX conversion, import from `converters/math_helpers.py`:
+
+```python
+from converters.math_helpers import _is_math_font, _has_formula_chars, _try_latex
 ```
 
 **That's all.** No changes to `core/`, `menu/`, `config/`, or any existing converter.
