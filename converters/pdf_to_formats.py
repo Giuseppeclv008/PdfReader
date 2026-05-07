@@ -113,6 +113,27 @@ def _pdf_ocr_extra_args() -> dict:
     return {"lang": lang, "math_ocr": math_ocr}
 
 
+def _looks_like_formula(pil_img) -> bool:
+    """Heuristic: small-ish, wide-or-squarish image → plausible formula."""
+    w, h = pil_img.size
+    if w < 20 or h < 20:
+        return False
+    if w * h > 4_000_000:  # skip full-page / photo-sized images
+        return False
+    aspect = w / h
+    return 0.3 < aspect < 20  # very tall or very wide strips are unlikely formulas
+
+
+def _try_latex(latex_model, pil_img) -> str | None:
+    try:
+        latex = latex_model(pil_img)
+        if latex and latex.strip() and any(c in latex for c in r"\^_{}"):
+            return latex.strip()
+    except Exception:
+        pass
+    return None
+
+
 def _pdf_to_md_ocr(
     doc, stem: str, out_dir: Path,
     lang: str = "ita+eng", math_ocr: bool = False, **_
@@ -143,20 +164,28 @@ def _pdf_to_md_ocr(
     pages = list(enumerate(doc, start=1))
     for i, page in progress(pages, desc="OCR", unit="pg", position=1, leave=False):
         pix = page.get_pixmap(matrix=_OCR_MAT)
-        img = Image.open(io.BytesIO(pix.tobytes("png")))
-        text = pytesseract.image_to_string(img, lang=lang).strip()
+        page_img = Image.open(io.BytesIO(pix.tobytes("png")))
+        text = pytesseract.image_to_string(page_img, lang=lang).strip()
 
         lines.append(f"\n---\n\n## Page {i}\n")
         if text:
             lines.append(f"\n{text}\n")
 
         if latex_model is not None:
-            try:
-                latex = latex_model(img)
-                if latex and latex.strip():
-                    lines.append(f"\n**Formulas:**\n\n$$\n{latex.strip()}\n$$\n")
-            except Exception:
-                pass
+            # Run pix2tex on each embedded image individually, not the full page.
+            # Formula images are typically stored as separate xref objects in the PDF.
+            for img_info in page.get_images(full=True):
+                xref = img_info[0]
+                try:
+                    base_image = doc.extract_image(xref)
+                    formula_img = Image.open(io.BytesIO(base_image["image"]))
+                    if not _looks_like_formula(formula_img):
+                        continue
+                    latex = _try_latex(latex_model, formula_img)
+                    if latex:
+                        lines.append(f"\n$$\n{latex}\n$$\n")
+                except Exception:
+                    pass
 
     return "\n".join(lines), f"{stem}_ocr.md"
 

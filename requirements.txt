@@ -10,5 +10,5 @@ markdown>=3.5
 pytesseract>=0.3.10
 pillow>=10.0.0
 
-# Optional — required only for format 7 math formula recognition:
-# pix2tex>=0.1.0
+# Required for format 7 math formula recognition (applied per embedded image, not full page):
+pix2tex>=0.1.0
