@@ -58,9 +58,19 @@ def _block_is_legible(block, block_text: str) -> bool:
     return True
 
 
-def _render_block_png(page, block, mat, out_path):
-    """Stub: Render block to PNG."""
-    raise NotImplementedError
+def _render_block_png(page, block, mat, out_path: Path) -> bool:
+    """Render a block bounding box to PNG at 2× resolution. Returns True on success."""
+    import fitz
+    bbox = block["bbox"]
+    if bbox[2] - bbox[0] < 5 or bbox[3] - bbox[1] < 5:
+        return False
+    try:
+        pix = page.get_pixmap(matrix=mat, clip=fitz.Rect(bbox))
+        pix.save(str(out_path))
+        return True
+    except Exception:
+        print(f"[warn] skip block crop {out_path.name}", file=sys.stderr)
+        return False
 
 
 def _pdf_to_md_hybrid(doc, stem, out_dir, **_):

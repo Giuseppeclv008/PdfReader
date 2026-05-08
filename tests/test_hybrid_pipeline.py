@@ -74,3 +74,28 @@ def test_not_legible_cmex_chars():
 def test_not_legible_math_font_dominant():
     block = _make_block("abcde", font="CMMI10")
     assert _block_is_legible(block, "abcde") is False
+
+
+def test_render_block_png_creates_file(tmp_path):
+    import fitz
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=100)
+    page.insert_text((10, 50), "Hello", fontsize=12)
+    mat = fitz.Matrix(2, 2)
+    block = {"bbox": (0.0, 0.0, 200.0, 100.0), "type": 0}
+    out = tmp_path / "block.png"
+    result = _render_block_png(page, block, mat, out)
+    assert result is True
+    assert out.exists()
+
+
+def test_render_block_png_skips_tiny_bbox(tmp_path):
+    import fitz
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=100)
+    mat = fitz.Matrix(2, 2)
+    block = {"bbox": (0.0, 0.0, 3.0, 3.0), "type": 0}
+    out = tmp_path / "tiny.png"
+    result = _render_block_png(page, block, mat, out)
+    assert result is False
+    assert not out.exists()
