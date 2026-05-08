@@ -151,3 +151,19 @@ def _pdf_to_md_hybrid(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
                     lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
 
     return "\n".join(lines), f"{stem}_hybrid.md"
+
+
+# ── registration ──────────────────────────────────────────────────────────────
+
+register(ConversionFormat(
+    key="9",
+    name="Markdown ibrido testo+immagine",
+    description=(
+        "Testo per blocchi leggibili; callout ⚠️ + PNG per formule/grafici. "
+        "Output: _hybrid.md + <nome>_blocks/."
+    ),
+    ext="md",
+    source_ext=".pdf",
+    convert=_pdf_to_md_hybrid,
+    extra_args=None,
+))
