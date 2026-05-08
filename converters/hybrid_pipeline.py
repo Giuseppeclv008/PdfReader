@@ -37,14 +37,25 @@ def _block_should_skip(block_text: str) -> bool:
     return False
 
 
-def _block_is_legible(block, block_text: str) -> bool:
-    """Stub: Check if block has legible text."""
-    raise NotImplementedError
-
-
 def _math_font_fraction(block) -> float:
-    """Stub: Calculate fraction of text in math fonts."""
-    raise NotImplementedError
+    """Fraction of chars in block rendered with math fonts (CM, STIX, etc.)."""
+    total = math_chars = 0
+    for line in block.get("lines", []):
+        for span in line.get("spans", []):
+            t = span.get("text", "")
+            total += len(t)
+            if _is_math_font(span.get("font", "")):
+                math_chars += len(t)
+    return math_chars / total if total > 0 else 0.0
+
+
+def _block_is_legible(block, block_text: str) -> bool:
+    """True if block text is human-readable (no CMEX garbage, no dominant math fonts)."""
+    if _has_formula_chars(block_text):
+        return False
+    if _math_font_fraction(block) > 0.30:
+        return False
+    return True
 
 
 def _render_block_png(page, block, mat, out_path):
