@@ -102,7 +102,7 @@ def test_render_block_png_skips_tiny_bbox(tmp_path):
     assert not out.exists()
 
 
-_INPUT_DIR = Path("input_pdfs")
+_INPUT_DIR = Path(__file__).parent.parent / "input_pdfs"
 
 
 def test_hybrid_output_structure(tmp_path):

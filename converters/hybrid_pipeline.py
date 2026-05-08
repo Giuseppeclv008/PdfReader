@@ -121,7 +121,7 @@ def _pdf_to_md_hybrid(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
             block_type = block.get("type", 0)
 
             if block_type == 1:
-                # Raster image embedded in PDF
+                # Raster image embedded in PDF (TODO: pix2tex for formula images)
                 ensure_blocks_dir()
                 out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
                 if _render_block_png(page, block, mat, out_path):
