@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 from converters.hybrid_pipeline import (
     _block_should_skip,
     _block_is_legible,
@@ -99,3 +100,19 @@ def test_render_block_png_skips_tiny_bbox(tmp_path):
     result = _render_block_png(page, block, mat, out)
     assert result is False
     assert not out.exists()
+
+
+_INPUT_DIR = Path("input_pdfs")
+
+
+def test_hybrid_output_structure(tmp_path):
+    import fitz
+    pdfs = list(_INPUT_DIR.glob("*.pdf"))
+    if not pdfs:
+        pytest.skip("No PDFs in input_pdfs/")
+    doc = fitz.open(str(pdfs[0]))
+    stem = pdfs[0].stem
+    content, filename = _pdf_to_md_hybrid(doc, stem, tmp_path)
+    assert filename == f"{stem}_hybrid.md"
+    assert f"# {stem}" in content
+    assert "## Page 1" in content

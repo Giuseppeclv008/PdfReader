@@ -73,6 +73,81 @@ def _render_block_png(page, block, mat, out_path: Path) -> bool:
         return False
 
 
-def _pdf_to_md_hybrid(doc, stem, out_dir, **_):
-    """Stub: Convert PDF to markdown (format 9)."""
-    raise NotImplementedError
+def _extract_block_text(block) -> str:
+    """Concatenate all span texts in a block into a single string."""
+    lines = []
+    for line in block.get("lines", []):
+        line_text = "".join(s.get("text", "") for s in line.get("spans", [])).strip()
+        if line_text:
+            lines.append(line_text)
+    return " ".join(lines)
+
+
+def _pdf_to_md_hybrid(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+    import fitz
+
+    blocks_dir = out_dir / f"{stem}_blocks"
+    mat = fitz.Matrix(2, 2)
+    blocks_dir_created = False
+
+    def ensure_blocks_dir():
+        nonlocal blocks_dir_created
+        if not blocks_dir_created:
+            blocks_dir.mkdir(exist_ok=True)
+            blocks_dir_created = True
+
+    lines = [f"# {stem}\n"]
+    pages = list(enumerate(doc, start=1))
+
+    for page_num, page in progress(pages, desc="Hybrid", unit="pg", position=1, leave=False):
+        lines.append(f"\n---\n\n## Page {page_num}\n")
+
+        # Scanned page: no extractable text → full-page PNG
+        if not page.get_text("text").strip():
+            ensure_blocks_dir()
+            out_path = blocks_dir / f"p{page_num}_full.png"
+            try:
+                pix = page.get_pixmap(matrix=mat)
+                pix.save(str(out_path))
+                lines.append(f"\n![]({stem}_blocks/p{page_num}_full.png)\n")
+            except Exception:
+                print(f"[warn] skip scanned page {page_num}", file=sys.stderr)
+            continue
+
+        d = page.get_text("dict")
+        blocks = sorted(d.get("blocks", []), key=lambda b: b["bbox"][1])
+
+        for block_idx, block in enumerate(blocks):
+            block_type = block.get("type", 0)
+
+            if block_type == 1:
+                # Raster image embedded in PDF
+                ensure_blocks_dir()
+                out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
+                if _render_block_png(page, block, mat, out_path):
+                    lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
+                continue
+
+            if block_type != 0:
+                continue
+
+            block_text = _extract_block_text(block)
+            if not block_text:
+                continue
+
+            if _block_should_skip(block_text):
+                continue
+
+            if _block_is_legible(block, block_text):
+                lines.append(f"\n{block_text}\n")
+            else:
+                ensure_blocks_dir()
+                out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
+                quoted = "\n> ".join(block_text.splitlines())
+                lines.append(
+                    f"\n> ⚠️ Testo estratto (potrebbe essere impreciso):\n> {quoted}\n"
+                )
+                if _render_block_png(page, block, mat, out_path):
+                    lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
+
+    return "\n".join(lines), f"{stem}_hybrid.md"
