@@ -305,12 +305,24 @@ def _pdf_ocr_extra_args() -> dict:
 
     ai_raw = input("Enable AI OCR cleanup via local Ollama LLM? [y/N]: ").strip().lower()
     ai_clean = ai_raw in ("y", "yes")
+    ai_model = None
     if ai_clean:
         import os
-        model = os.environ.get("AI_MODEL", "qwen2.5:3b")
-        print(f"→ AI cleanup enabled (model: {model}, override via AI_MODEL env var)\n")
+        env_override = os.environ.get("AI_MODEL")
+        if env_override:
+            ai_model = env_override
+            print(f"→ AI cleanup enabled (model: {ai_model}, from AI_MODEL env var)\n")
+        else:
+            print(
+                "  Pick a model:\n"
+                "    1. qwen2.5:3b   — conservative, preserves original wording (recommended)\n"
+                "    2. llama3.2:3b  — more aggressive accent fixes, may alter meaning\n"
+            )
+            mraw = input("  Model [1]: ").strip()
+            ai_model = "llama3.2:3b" if mraw == "2" else "qwen2.5:3b"
+            print(f"→ AI cleanup enabled (model: {ai_model})\n")
 
-    return {"lang": lang, "math_ocr": math_ocr, "ai_clean": ai_clean}
+    return {"lang": lang, "math_ocr": math_ocr, "ai_clean": ai_clean, "ai_model": ai_model}
 
 
 def _preprocess_for_ocr(pil_img, ImageOps_mod):
@@ -343,7 +355,8 @@ def _clean_ocr_text(raw: str) -> str:
 
 def _pdf_to_md_ocr(
     doc, stem: str, out_dir: Path,
-    lang: str = "ita+eng", math_ocr: bool = False, ai_clean: bool = False, **_
+    lang: str = "ita+eng", math_ocr: bool = False,
+    ai_clean: bool = False, ai_model: str | None = None, **_
 ) -> tuple[str, str]:
     try:
         import pytesseract
@@ -386,7 +399,10 @@ def _pdf_to_md_ocr(
             page_md = _clean_ocr_text(raw_ocr).strip()
             if ai_clean and page_md:
                 from converters.ai_helpers import clean_ocr_text
-                page_md = clean_ocr_text(page_md)
+                if ai_model:
+                    page_md = clean_ocr_text(page_md, model=ai_model)
+                else:
+                    page_md = clean_ocr_text(page_md)
 
             if latex_model is not None:
                 extra = []
