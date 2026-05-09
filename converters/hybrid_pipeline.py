@@ -2,8 +2,9 @@
 
 Per-block strategy:
 - Good text blocks  → plain markdown text
-- Bad blocks (formula garbage, dominant math fonts) → warning callout + text + PNG crop
-- Image blocks (type 1) → PNG crop only
+- Bad blocks (formula garbage, dominant math fonts) → LaTeX via pix2tex if available,
+  else warning callout + text + PNG crop
+- Image blocks (type 1) → LaTeX via pix2tex if image looks like formula, else PNG crop
 - Chart noise (axis labels, legends, page counters) → skipped entirely
 - Scanned pages (no extractable text) → full-page PNG
 """
@@ -12,7 +13,13 @@ import re
 import sys
 from pathlib import Path
 
-from converters.math_helpers import _has_formula_chars, _is_math_font
+from converters.math_helpers import (
+    _has_formula_chars,
+    _is_math_font,
+    _looks_like_formula,
+    _try_latex,
+    _formula_render_mat,
+)
 from converters.base import ConversionFormat, register
 from utils.utils import progress
 
@@ -83,8 +90,49 @@ def _extract_block_text(block) -> str:
     return " ".join(lines)
 
 
-def _pdf_to_md_hybrid(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
+def _latex_from_block_region(page, block, latex_model, Image_cls, io_mod) -> str | None:
+    """Render block bbox at 3× and run pix2tex. Returns LaTeX string or None."""
+    if latex_model is None:
+        return None
+    try:
+        import fitz
+        formula_mat = _formula_render_mat()  # 3× for pix2tex quality
+        clip_pix = page.get_pixmap(matrix=formula_mat, clip=fitz.Rect(block["bbox"]))
+        formula_img = Image_cls.open(io_mod.BytesIO(clip_pix.tobytes("png")))
+        return _try_latex(latex_model, formula_img)
+    except Exception:
+        return None
+
+
+def _hybrid_extra_args() -> dict:
+    raw = input("Enable LaTeX formula recognition via pix2tex? [y/N]: ").strip().lower()
+    math_ocr = raw in ("y", "yes")
+    if math_ocr:
+        print("→ LaTeX recognition enabled (requires: pip install pix2tex)\n")
+    return {"math_ocr": math_ocr}
+
+
+def _pdf_to_md_hybrid(
+    doc, stem: str, out_dir: Path, math_ocr: bool = False, **_
+) -> tuple[str, str]:
     import fitz
+
+    latex_model = None
+    Image_cls = None
+    io_mod = None
+    if math_ocr:
+        try:
+            from pix2tex.cli import LatexOCR
+            from PIL import Image as _Image
+            import io as _io
+            latex_model = LatexOCR()
+            Image_cls = _Image
+            io_mod = _io
+        except ImportError:
+            sys.exit(
+                "LaTeX formula recognition requires an extra package:\n"
+                "  pip install pix2tex"
+            )
 
     blocks_dir = out_dir / f"{stem}_blocks"
     mat = fitz.Matrix(2, 2)
@@ -121,11 +169,24 @@ def _pdf_to_md_hybrid(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
             block_type = block.get("type", 0)
 
             if block_type == 1:
-                # Raster image embedded in PDF (TODO: pix2tex for formula images)
-                ensure_blocks_dir()
-                out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
-                if _render_block_png(page, block, mat, out_path):
-                    lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
+                # Raster image: try pix2tex if image looks like a formula
+                latex = None
+                if latex_model is not None:
+                    try:
+                        img_bytes = block.get("image", b"")
+                        if img_bytes:
+                            pil_img = Image_cls.open(io_mod.BytesIO(img_bytes))
+                            if _looks_like_formula(pil_img):
+                                latex = _try_latex(latex_model, pil_img)
+                    except Exception:
+                        pass
+                if latex:
+                    lines.append(f"\n$$\n{latex}\n$$\n")
+                else:
+                    ensure_blocks_dir()
+                    out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
+                    if _render_block_png(page, block, mat, out_path):
+                        lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
                 continue
 
             if block_type != 0:
@@ -141,14 +202,19 @@ def _pdf_to_md_hybrid(doc, stem: str, out_dir: Path, **_) -> tuple[str, str]:
             if _block_is_legible(block, block_text):
                 lines.append(f"\n{block_text}\n")
             else:
-                ensure_blocks_dir()
-                out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
-                quoted = "\n> ".join(block_text.splitlines())
-                lines.append(
-                    f"\n> ⚠️ Testo estratto (potrebbe essere impreciso):\n> {quoted}\n"
-                )
-                if _render_block_png(page, block, mat, out_path):
-                    lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
+                # Try pix2tex on block region; fallback to callout + PNG
+                latex = _latex_from_block_region(page, block, latex_model, Image_cls, io_mod)
+                if latex:
+                    lines.append(f"\n$$\n{latex}\n$$\n")
+                else:
+                    ensure_blocks_dir()
+                    out_path = blocks_dir / f"p{page_num}_b{block_idx}.png"
+                    quoted = "\n> ".join(block_text.splitlines())
+                    lines.append(
+                        f"\n> ⚠️ Testo estratto (potrebbe essere impreciso):\n> {quoted}\n"
+                    )
+                    if _render_block_png(page, block, mat, out_path):
+                        lines.append(f"\n![]({stem}_blocks/p{page_num}_b{block_idx}.png)\n")
 
     return "\n".join(lines), f"{stem}_hybrid.md"
 
@@ -159,11 +225,11 @@ register(ConversionFormat(
     key="9",
     name="Markdown ibrido testo+immagine",
     description=(
-        "Testo per blocchi leggibili; callout ⚠️ + PNG per formule/grafici. "
+        "Testo per blocchi leggibili; LaTeX (pix2tex) o PNG per formule/grafici. "
         "Output: _hybrid.md + <nome>_blocks/."
     ),
     ext="md",
     source_ext=".pdf",
     convert=_pdf_to_md_hybrid,
-    extra_args=None,
+    extra_args=_hybrid_extra_args,
 ))
