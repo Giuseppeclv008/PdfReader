@@ -322,7 +322,16 @@ def _pdf_ocr_extra_args() -> dict:
             ai_model = "llama3.2:3b" if mraw == "2" else "qwen2.5:3b"
             print(f"→ AI cleanup enabled (model: {ai_model})\n")
 
-    return {"lang": lang, "math_ocr": math_ocr, "ai_clean": ai_clean, "ai_model": ai_model}
+    tbl_raw = input("Detect and reproduce tables (img2table)? [y/N]: ").strip().lower()
+    tables = tbl_raw in ("y", "yes")
+    if tables:
+        print("→ Table detection enabled (requires: pip install img2table)\n")
+
+    return {
+        "lang": lang, "math_ocr": math_ocr,
+        "ai_clean": ai_clean, "ai_model": ai_model,
+        "tables": tables,
+    }
 
 
 def _preprocess_for_ocr(pil_img, ImageOps_mod):
@@ -356,7 +365,8 @@ def _clean_ocr_text(raw: str) -> str:
 def _pdf_to_md_ocr(
     doc, stem: str, out_dir: Path,
     lang: str = "ita+eng", math_ocr: bool = False,
-    ai_clean: bool = False, ai_model: str | None = None, **_
+    ai_clean: bool = False, ai_model: str | None = None,
+    tables: bool = False, **_
 ) -> tuple[str, str]:
     try:
         import pytesseract
@@ -392,7 +402,19 @@ def _pdf_to_md_ocr(
             # Scanned page: pytesseract OCR + pix2tex on raster formula images
             pix = page.get_pixmap(matrix=_OCR_MAT)
             page_img = Image.open(io.BytesIO(pix.tobytes("png")))
-            ocr_img = _preprocess_for_ocr(page_img, ImageOps)
+
+            tables_md: list[str] = []
+            table_bboxes: list[tuple[int, int, int, int]] = []
+            if tables:
+                from converters.table_helpers import extract_tables_md
+                tables_md, table_bboxes = extract_tables_md(page_img, lang)
+
+            if table_bboxes:
+                from converters.table_helpers import mask_regions
+                ocr_src = mask_regions(page_img, table_bboxes)
+            else:
+                ocr_src = page_img
+            ocr_img = _preprocess_for_ocr(ocr_src, ImageOps)
             raw_ocr = pytesseract.image_to_string(
                 ocr_img, lang=lang, config="--psm 6"
             )
@@ -403,6 +425,10 @@ def _pdf_to_md_ocr(
                     page_md = clean_ocr_text(page_md, model=ai_model)
                 else:
                     page_md = clean_ocr_text(page_md)
+
+            if tables_md:
+                tail = "\n\n".join(tables_md)
+                page_md = f"{page_md}\n\n{tail}" if page_md else tail
 
             if latex_model is not None:
                 extra = []
@@ -431,6 +457,6 @@ def _pdf_to_md_ocr(
 
 register(ConversionFormat(
     key="7", name="Markdown + OCR text (pytesseract + optional math)",
-    description="OCR via pytesseract; optionally adds LaTeX math via pix2tex. Requires: pip install pytesseract pillow + Tesseract binary. Math: pip install pix2tex.",
+    description="OCR via pytesseract; optionally adds LaTeX math via pix2tex and pipe-table reproduction via img2table. Requires: pip install pytesseract pillow + Tesseract binary. Math: pip install pix2tex. Tables: pip install img2table.",
     ext="md", source_ext=".pdf", convert=_pdf_to_md_ocr, extra_args=_pdf_ocr_extra_args,
 ))

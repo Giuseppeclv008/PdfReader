@@ -18,3 +18,10 @@ pix2tex>=0.1.0
 # Install Ollama: https://ollama.com/download
 # Pull model:    ollama pull qwen2.5:3b
 ollama>=0.3.0
+
+# Optional — required only for format 7 table extraction on scanned pages.
+# img2table 0.0.12 uses pre-1.0 polars APIs (`pl.from_dicts(dicts=...)`,
+# `pl.max([...])`); the table_helpers module shims `from_dicts`, but the rest
+# needs polars <0.17.
+img2table>=0.0.12
+polars<0.17
