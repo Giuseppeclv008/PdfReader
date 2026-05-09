@@ -303,7 +303,14 @@ def _pdf_ocr_extra_args() -> dict:
     if math_ocr:
         print("→ Math OCR enabled (requires: pip install pix2tex)\n")
 
-    return {"lang": lang, "math_ocr": math_ocr}
+    ai_raw = input("Enable AI OCR cleanup via local Ollama LLM? [y/N]: ").strip().lower()
+    ai_clean = ai_raw in ("y", "yes")
+    if ai_clean:
+        import os
+        model = os.environ.get("AI_MODEL", "gemma3:4b")
+        print(f"→ AI cleanup enabled (model: {model}, override via AI_MODEL env var)\n")
+
+    return {"lang": lang, "math_ocr": math_ocr, "ai_clean": ai_clean}
 
 
 def _preprocess_for_ocr(pil_img, ImageOps_mod):
@@ -336,7 +343,7 @@ def _clean_ocr_text(raw: str) -> str:
 
 def _pdf_to_md_ocr(
     doc, stem: str, out_dir: Path,
-    lang: str = "ita+eng", math_ocr: bool = False, **_
+    lang: str = "ita+eng", math_ocr: bool = False, ai_clean: bool = False, **_
 ) -> tuple[str, str]:
     try:
         import pytesseract
@@ -377,6 +384,9 @@ def _pdf_to_md_ocr(
                 ocr_img, lang=lang, config="--psm 6"
             )
             page_md = _clean_ocr_text(raw_ocr).strip()
+            if ai_clean and page_md:
+                from converters.ai_helpers import clean_ocr_text
+                page_md = clean_ocr_text(page_md)
 
             if latex_model is not None:
                 extra = []
