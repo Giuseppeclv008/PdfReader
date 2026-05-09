@@ -7,7 +7,7 @@ Default model picked via env var AI_MODEL (fallback: gemma3:4b).
 import os
 import sys
 
-_DEFAULT_MODEL = os.environ.get("AI_MODEL", "gemma3:4b")
+_DEFAULT_MODEL = os.environ.get("AI_MODEL", "qwen2.5:3b")
 
 _OCR_CLEANUP_SYSTEM = """You are an OCR text cleanup tool for Italian and English text.
 Your ONLY task is to fix obvious OCR character-recognition errors.

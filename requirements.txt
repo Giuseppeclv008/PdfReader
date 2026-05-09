@@ -14,7 +14,7 @@ pillow>=10.0.0
 pix2tex>=0.1.0
 
 # Optional — required only for format 7 AI OCR cleanup (--ai_clean):
-# Needs Ollama daemon running locally + a model pulled (default: gemma3:4b).
+# Needs Ollama daemon running locally + a model pulled (default: qwen2.5:3b).
 # Install Ollama: https://ollama.com/download
-# Pull model:    ollama pull gemma3:4b
+# Pull model:    ollama pull qwen2.5:3b
 ollama>=0.3.0

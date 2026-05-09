@@ -307,7 +307,7 @@ def _pdf_ocr_extra_args() -> dict:
     ai_clean = ai_raw in ("y", "yes")
     if ai_clean:
         import os
-        model = os.environ.get("AI_MODEL", "gemma3:4b")
+        model = os.environ.get("AI_MODEL", "qwen2.5:3b")
         print(f"→ AI cleanup enabled (model: {model}, override via AI_MODEL env var)\n")
 
     return {"lang": lang, "math_ocr": math_ocr, "ai_clean": ai_clean}
