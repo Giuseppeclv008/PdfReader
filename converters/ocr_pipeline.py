@@ -306,13 +306,41 @@ def _pdf_ocr_extra_args() -> dict:
     return {"lang": lang, "math_ocr": math_ocr}
 
 
+def _preprocess_for_ocr(pil_img, ImageOps_mod):
+    """Light preprocessing to improve OCR on stamps and dense pages.
+
+    Grayscale + autocontrast — keeps faint text legible without destroying
+    handwritten regions through aggressive thresholding.
+    """
+    return ImageOps_mod.autocontrast(pil_img.convert("L"), cutoff=2)
+
+
+def _is_ocr_noise(line: str) -> bool:
+    """True if a line is OCR garbage (stamp/signature fragments)."""
+    s = line.strip()
+    if len(s) <= 2:
+        return True
+    alpha = sum(1 for c in s if c.isalpha())
+    if alpha / len(s) < 0.4:
+        return True
+    tokens = s.split()
+    if tokens and len(tokens) <= 4 and all(len(t) <= 2 for t in tokens):
+        return True
+    return False
+
+
+def _clean_ocr_text(raw: str) -> str:
+    """Drop OCR-noise lines while preserving real content."""
+    return "\n".join(line for line in raw.splitlines() if not _is_ocr_noise(line))
+
+
 def _pdf_to_md_ocr(
     doc, stem: str, out_dir: Path,
     lang: str = "ita+eng", math_ocr: bool = False, **_
 ) -> tuple[str, str]:
     try:
         import pytesseract
-        from PIL import Image
+        from PIL import Image, ImageOps
         import io
     except ImportError:
         sys.exit(
@@ -344,7 +372,11 @@ def _pdf_to_md_ocr(
             # Scanned page: pytesseract OCR + pix2tex on raster formula images
             pix = page.get_pixmap(matrix=_OCR_MAT)
             page_img = Image.open(io.BytesIO(pix.tobytes("png")))
-            page_md = pytesseract.image_to_string(page_img, lang=lang).strip()
+            ocr_img = _preprocess_for_ocr(page_img, ImageOps)
+            raw_ocr = pytesseract.image_to_string(
+                ocr_img, lang=lang, config="--psm 6"
+            )
+            page_md = _clean_ocr_text(raw_ocr).strip()
 
             if latex_model is not None:
                 extra = []
